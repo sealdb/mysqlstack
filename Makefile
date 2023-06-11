@@ -29,8 +29,9 @@ testdriver:
 
 COVPKGS = ./sqlparser/... ./sqldb ./proto ./packet ./driver
 coverage:
-	go get github.com/pierrre/gotestcover
-	gotestcover -coverprofile=coverage.out -v $(COVPKGS)
+	# go get github.com/pierrre/gotestcover
+	go build -v -o bin/gotestcover tools/gotestcover/gotestcover.go
+	bin/gotestcover -coverprofile=coverage.out -v $(COVPKGS)
 	go tool cover -html=coverage.out
 
 .PHONY: fmt testcommon testproto testpacket testdriver coverage

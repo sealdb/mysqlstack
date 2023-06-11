@@ -12,9 +12,9 @@ package proto
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sealdb/mysqlstack/sqldb"
 	"github.com/sealdb/mysqlstack/sqlparser/depends/common"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAuth(t *testing.T) {

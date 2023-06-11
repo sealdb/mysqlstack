@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sealdb/mysqlstack/xlog"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSession(t *testing.T) {

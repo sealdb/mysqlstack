@@ -12,8 +12,8 @@ package proto
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sealdb/mysqlstack/sqldb"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/sealdb/mysqlstack/sqlparser/depends/common"
 )

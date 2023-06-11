@@ -12,8 +12,8 @@ package proto
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sealdb/mysqlstack/sqlparser/depends/sqltypes"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/sealdb/mysqlstack/sqlparser/depends/common"
 	querypb "github.com/sealdb/mysqlstack/sqlparser/depends/query"

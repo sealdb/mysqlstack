@@ -10,9 +10,9 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/shopspring/decimal"
 	"github.com/sealdb/mysqlstack/sqlparser/depends/common"
 	querypb "github.com/sealdb/mysqlstack/sqlparser/depends/query"
+	"github.com/shopspring/decimal"
 )
 
 // numeric represents a numeric value extracted from

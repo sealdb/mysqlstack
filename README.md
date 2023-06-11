@@ -12,7 +12,7 @@ Protocol is based on [mysqlproto-go](https://github.com/pubnative/mysqlproto-go)
 $ mkdir src
 $ export GOPATH=`pwd`
 $ go get -u github.com/sealdb/mysqlstack/driver
-$ cd src/github.com/sealdb/mysqlstack/
+$ cd mysqlstack/
 $ make test
 ```
 
@@ -39,4 +39,3 @@ mysqlstack is production ready.
 ## License
 
 mysqlstack is released under the BSD-3-Clause License. See [LICENSE](https://github.com/sealdb/mysqlstack/blob/main/LICENSE)
-

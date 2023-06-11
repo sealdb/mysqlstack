@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sealdb/mysqlstack/proto"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/sealdb/mysqlstack/sqlparser/depends/common"
 	querypb "github.com/sealdb/mysqlstack/sqlparser/depends/query"
