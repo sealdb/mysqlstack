@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/sealdb/mysqlstack.png)](https://travis-ci.org/sealdb/mysqlstack) [![Go Report Card](https://goreportcard.com/badge/github.com/sealdb/mysqlstack)](https://goreportcard.com/report/github.com/sealdb/mysqlstack) [![codecov.io](https://codecov.io/gh/sealdb/mysqlstack/graphs/badge.svg)](https://codecov.io/gh/sealdb/mysqlstack/branch/master)
+[![Build Status](https://travis-ci.org/sealdb/mysqlstack.png)](https://travis-ci.org/sealdb/mysqlstack) [![Go Report Card](https://goreportcard.com/badge/github.com/sealdb/mysqlstack)](https://goreportcard.com/report/github.com/sealdb/mysqlstack) [![codecov.io](https://codecov.io/gh/sealdb/mysqlstack/graphs/badge.svg)](https://codecov.io/gh/sealdb/mysqlstack/branch/main)
 
 # mysqlstack
 
@@ -38,4 +38,5 @@ mysqlstack is production ready.
 
 ## License
 
-mysqlstack is released under the BSD-3-Clause License. See [LICENSE](https://github.com/sealdb/mysqlstack/blob/master/LICENSE)
+mysqlstack is released under the BSD-3-Clause License. See [LICENSE](https://github.com/sealdb/mysqlstack/blob/main/LICENSE)
+
