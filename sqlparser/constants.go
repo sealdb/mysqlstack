@@ -50,6 +50,7 @@ const (
 	CreateIndexStr          = "create index"
 	DropDBStr               = "drop database"
 	DropTableStr            = "drop table"
+	DropTempTableStr        = "drop temporary table"
 	DropIndexStr            = "drop index"
 	AlterStr                = "alter"
 	AlterEngineStr          = "alter table"
@@ -57,6 +58,7 @@ const (
 	AlterAddColumnStr       = "alter table add column"
 	AlterDropColumnStr      = "alter table drop column"
 	AlterModifyColumnStr    = "alter table modify column"
+	AlterDatabase           = "alter database"
 	RenameStr               = "rename table"
 	TruncateTableStr        = "truncate table"
 	SingleTableType         = "singletable"
@@ -77,6 +79,7 @@ const (
 	ShowTableStatusStr    = "table status"
 	ShowTablesStr         = "tables"
 	ShowColumnsStr        = "columns"
+	ShowIndexStr          = "index"
 	ShowCreateTableStr    = "create table"
 	ShowEnginesStr        = "engines"
 	ShowStatusStr         = "status"
@@ -87,6 +90,8 @@ const (
 	ShowWarningsStr       = "warnings"
 	ShowVariablesStr      = "variables"
 	ShowBinlogEventsStr   = "binlog events"
+	ShowCharsetStr        = "charset"
+	ShowCollationStr      = "collation"
 	ShowUnsupportedStr    = "unsupported"
 
 	// JoinTableExpr.Join.
@@ -102,10 +107,6 @@ const (
 	UseStr    = "use "
 	IgnoreStr = "ignore "
 	ForceStr  = "force "
-
-	// Where.Type
-	WhereStr  = "where"
-	HavingStr = "having"
 
 	// ComparisonExpr.Operator
 	EqualStr             = "="
@@ -174,6 +175,10 @@ const (
 	AttachListStr = "attachlist"
 	ReshardStr    = "reshard"
 	CleanupStr    = "cleanup"
+	RebalanceStr  = "rebalance"
+	XARecoverStr  = "xa recover"
+	XACommitStr   = "xa commit"
+	XARollbackStr = "xa rollback"
 
 	// Transaction isolation levels.
 	ReadUncommitted = "read uncommitted"
@@ -197,3 +202,116 @@ const (
 	// CommitTxnStr represents the txn commit.
 	CommitTxnStr = "commit"
 )
+
+// ExplainType is an enum for Explain-Type.
+type ExplainType int8
+
+// ExplainType const values.
+const (
+	ExplainTypeEmpty ExplainType = iota
+	ExplainTypeExtended
+	ExplainTypePartitions
+	ExplainTypeTree
+	ExplainTypeJSON
+	ExplainTypeTraditional
+)
+
+// ChecksumOptionEnum is an enum for checksum statement.
+// see: https://dev.mysql.com/doc/refman/8.0/en/checksum-table.html
+type ChecksumOptionEnum int
+
+// ChecksumOptionEnum const values.
+const (
+	ChecksumOptionNone ChecksumOptionEnum = iota
+	ChecksumOptionQuick
+	ChecksumOptionExtended
+)
+
+// ChecksumOption2Str is a map for enum option-->string
+var ChecksumOption2Str = map[ChecksumOptionEnum]string{
+	ChecksumOptionNone:     "",
+	ChecksumOptionQuick:    "quick",
+	ChecksumOptionExtended: "extended",
+}
+
+// OptimizeOptionEnum is an enum for optimize statement.
+type OptimizeOptionEnum int
+
+// OptimizeOptionEnum const values.
+const (
+	OptimizeOptionNone OptimizeOptionEnum = iota
+	OptimizeOptionNoWriteToBinlog
+	OptimizeOptionLocal
+)
+
+// OptimizeOption2Str is a map for enum option-->string
+var OptimizeOption2Str = map[OptimizeOptionEnum]string{
+	OptimizeOptionNone:            "",
+	OptimizeOptionNoWriteToBinlog: "no_write_to_binlog",
+	OptimizeOptionLocal:           "local",
+}
+
+// CheckOptionEnum is an enum for check statement.
+type CheckOptionEnum int
+
+// CheckOptionList is used by check statement.
+type CheckOptionList []CheckOptionEnum
+
+// CheckOptionEnum const values.
+const (
+	CheckOptionNone CheckOptionEnum = iota
+	CheckOptionForUpgrade
+	CheckOptionQuick
+	CheckOptionFast
+	CheckOptionMedium
+	CheckOptionExtended
+	CheckOptionChanged
+)
+
+// CheckOption2Str is a map for enum option --> string.
+var CheckOption2Str = map[CheckOptionEnum]string{
+	CheckOptionNone:       "",
+	CheckOptionForUpgrade: "for upgrade",
+	CheckOptionQuick:      "quick",
+	CheckOptionFast:       "fast",
+	CheckOptionMedium:     "medium",
+	CheckOptionExtended:   "extended",
+	CheckOptionChanged:    "changed",
+}
+
+// WhereType is an enum for Where.Type
+type WhereTypeEnum int8
+
+// WhereType const values.
+const (
+	NoWhereType WhereTypeEnum = iota
+	WhereClause
+	HavingClause
+)
+
+// WhereType2Str is a map for enum option --> string.
+var WhereType2Str = map[WhereTypeEnum]string{
+	NoWhereType:  "Unknown where type",
+	WhereClause:  "where",
+	HavingClause: "having",
+}
+
+// DeleteOptionEnum is an enum for delete statement.
+// See https://dev.mysql.com/doc/refman/8.0/en/delete.html
+type DeleteOptionEnum int
+
+// DeleteOptionEnum const values.
+const (
+	NoDeleteOption DeleteOptionEnum = iota
+	LowPriorityOption
+	QuickOption
+	IgnoreOption
+)
+
+// DeleteOptions2Str is a map for enum option --> string.
+var DeleteOptions2Str = map[DeleteOptionEnum]string{
+	NoDeleteOption:    "Unknown delete option",
+	LowPriorityOption: "low_priority",
+	QuickOption:       "quick",
+	IgnoreOption:      "ignore",
+}

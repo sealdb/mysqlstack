@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Google Inc.
+Copyright 2023-2030 NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +26,7 @@ func TestExplain(t *testing.T) {
 		output string
 	}{
 		{
-			input:  "explain select * from 1",
+			input:  "explain select * from t",
 			output: "explain",
 		},
 	}

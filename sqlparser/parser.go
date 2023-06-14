@@ -1,5 +1,6 @@
 /*
 Copyright 2019 The Vitess Authors.
+Copyright 2023-2030 NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,9 +36,8 @@ var zeroParser = *(yyNewParser().(*yyParserImpl))
 //
 // N.B: Parser pooling means that you CANNOT take references directly to parse stack variables (e.g.
 // $$ = &$4) in sql.y rules. You must instead add an intermediate reference like so:
-//
-//	showCollationFilterOpt := $4
-//	$$ = &Show{Type: string($2), ShowCollationFilterOpt: &showCollationFilterOpt}
+//    showCollationFilterOpt := $4
+//    $$ = &Show{Type: string($2), ShowCollationFilterOpt: &showCollationFilterOpt}
 func yyParsePooled(yylex yyLexer) int {
 	// Being very particular about using the base type and not an interface type b/c we depend on
 	// the implementation to know how to reinitialize the parser.

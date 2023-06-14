@@ -1,5 +1,6 @@
 /*
 Copyright 2019 The Vitess Authors.
+Copyright 2023-2030 The NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,6 +71,36 @@ func Append(buf *strings.Builder, node SQLNode) {
 	node.Format(tbuf)
 }
 
+// LowerCaseTableNames use to lower case the table names(table ident).
+func LowerCaseTableNames(stmt SQLNode) SQLNode {
+	return Rewrite(stmt, func(cursor *Cursor) bool {
+		switch n := cursor.Node().(type) {
+		case TableName:
+			if !n.IsEmpty() {
+				name := NewTableIdent(strings.ToLower(n.Name.v))
+				qualifier := NewTableIdent("")
+				if !n.Qualifier.IsEmpty() {
+					qualifier.v = strings.ToLower(n.Qualifier.v)
+				}
+				tb := TableName{
+					Name:      name,
+					Qualifier: qualifier,
+				}
+				cursor.Replace(tb)
+			}
+			return false
+		case TableIdent:
+			if !n.IsEmpty() {
+				id := NewTableIdent(strings.ToLower(n.v))
+				cursor.Replace(id)
+			}
+			return false
+		default:
+			return true
+		}
+	}, nil)
+}
+
 // AddWhere adds the boolean expression to the
 // WHERE clause as an AND condition. If the expression
 // is an OR clause, it parenthesizes it. Currently,
@@ -81,7 +112,7 @@ func (node *Select) AddWhere(expr Expr) {
 	}
 	if node.Where == nil {
 		node.Where = &Where{
-			Type: WhereStr,
+			Type: WhereClause,
 			Expr: expr,
 		}
 		return
@@ -103,7 +134,7 @@ func (node *Select) AddHaving(expr Expr) {
 	}
 	if node.Having == nil {
 		node.Having = &Where{
-			Type: HavingStr,
+			Type: HavingClause,
 			Expr: expr,
 		}
 		return
@@ -115,10 +146,13 @@ func (node *Select) AddHaving(expr Expr) {
 }
 
 // DatabaseOption represents database option.
-// See: https://dev.mysql.com/doc/refman/5.7/en/create-database.html
+// See: https://dev.mysql.com/doc/refman/8.0/en/create-database.html
 type DatabaseOption struct {
-	Value            string
-	CharsetOrCollate string
+	OptType string
+	Value   *SQLVal
+	// "ReadOnlyValue" only used in alter database stmt, introduced in 8.0, for simplify code, we put it here.
+	// value: "default", "1", "0"
+	ReadOnlyValue string
 }
 
 // TableOptionType is the type for table_options
@@ -129,7 +163,6 @@ const (
 	TableOptionComment
 	TableOptionEngine
 	TableOptionCharset
-	TableOptionTableType
 	TableOptionAutoInc
 	TableOptionAvgRowLength
 	TableOptionChecksum
@@ -154,13 +187,12 @@ const (
 )
 
 // Although each option can be appeared many times in MySQL, we make a constraint
-// that each option should only be appeared just one time in RadonDB.
+// that each option should only be appeared just one time in NeoDB.
 func (tblOptList *TableOptionListOpt) CheckIfTableOptDuplicate() string {
 	var optOnce = map[TableOptionType]bool{
 		TableOptionComment:          false,
 		TableOptionEngine:           false,
 		TableOptionCharset:          false,
-		TableOptionTableType:        false,
 		TableOptionAutoInc:          false,
 		TableOptionAvgRowLength:     false,
 		TableOptionChecksum:         false,
@@ -186,127 +218,122 @@ func (tblOptList *TableOptionListOpt) CheckIfTableOptDuplicate() string {
 		switch opt.Type {
 		case TableOptionComment:
 			if optOnce[TableOptionComment] {
-				return "Duplicate table option for keyword 'comment', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'comment', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionComment] = true
 		case TableOptionEngine:
 			if optOnce[TableOptionEngine] {
-				return "Duplicate table option for keyword 'engine', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'engine', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionEngine] = true
 		case TableOptionCharset:
 			if optOnce[TableOptionCharset] {
-				return "Duplicate table option for keyword 'charset', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'charset', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionCharset] = true
-		case TableOptionTableType:
-			if optOnce[TableOptionTableType] {
-				return "Duplicate table option for keyword 'single or global', the option should only be appeared just one time in RadonDB."
-			}
-			optOnce[TableOptionTableType] = true
 		case TableOptionAutoInc:
 			if optOnce[TableOptionAutoInc] {
-				return "Duplicate table option for keyword 'auto_increment', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'auto_increment', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionAutoInc] = true
 		case TableOptionAvgRowLength:
 			if optOnce[TableOptionAvgRowLength] {
-				return "Duplicate table option for keyword 'avg_row_length', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'avg_row_length', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionAvgRowLength] = true
 		case TableOptionChecksum:
 			if optOnce[TableOptionChecksum] {
-				return "Duplicate table option for keyword 'checksum', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'checksum', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionChecksum] = true
 		case TableOptionCollate:
 			if optOnce[TableOptionCollate] {
-				return "Duplicate table option for table option keyword 'collate', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for table option keyword 'collate', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionCollate] = true
 		case TableOptionCompression:
 			if optOnce[TableOptionCompression] {
-				return "Duplicate table option for keyword 'compression', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'compression', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionCompression] = true
 		case TableOptionConnection:
 			if optOnce[TableOptionConnection] {
-				return "Duplicate table option for keyword 'connection', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'connection', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionConnection] = true
 		case TableOptionDataDirectory:
 			if optOnce[TableOptionDataDirectory] {
-				return "Duplicate table option for keyword 'data directory', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'data directory', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionDataDirectory] = true
 		case TableOptionIndexDirectory:
 			if optOnce[TableOptionIndexDirectory] {
-				return "Duplicate table option for keyword 'index directory', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'index directory', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionIndexDirectory] = true
 		case TableOptionDelayKeyWrite:
 			if optOnce[TableOptionDelayKeyWrite] {
-				return "Duplicate table option for keyword 'delay_key_write', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'delay_key_write', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionDelayKeyWrite] = true
 		case TableOptionEncryption:
 			if optOnce[TableOptionEncryption] {
-				return "Duplicate table option for keyword 'encryption', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'encryption', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionEncryption] = true
 		case TableOptionInsertMethod:
 			if optOnce[TableOptionInsertMethod] {
-				return "Duplicate table option for keyword 'insert_method', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'insert_method', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionInsertMethod] = true
 		case TableOptionKeyBlockSize:
 			if optOnce[TableOptionKeyBlockSize] {
-				return "Duplicate table option for keyword 'key_block_size', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'key_block_size', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionKeyBlockSize] = true
 		case TableOptionMaxRows:
 			if optOnce[TableOptionMaxRows] {
-				return "Duplicate table option for keyword 'max_rows', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'max_rows', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionMaxRows] = true
 		case TableOptionMinRows:
 			if optOnce[TableOptionMinRows] {
-				return "Duplicate table option for keyword 'min_rows', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'min_rows', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionMinRows] = true
 		case TableOptionPackKeys:
 			if optOnce[TableOptionPackKeys] {
-				return "Duplicate table option for keyword 'pack_keys', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'pack_keys', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionPackKeys] = true
 		case TableOptionPassword:
 			if optOnce[TableOptionPassword] {
-				return "Duplicate table option for keyword 'password', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'password', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionPassword] = true
 		case TableOptionRowFormat:
 			if optOnce[TableOptionRowFormat] {
-				return "Duplicate table option for keyword 'row_format', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'row_format', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionRowFormat] = true
 		case TableOptionStatsAutoRecalc:
 			if optOnce[TableOptionStatsAutoRecalc] {
-				return "Duplicate table option for keyword 'stats_auto_recalc', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'stats_auto_recalc', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionStatsAutoRecalc] = true
 		case TableOptionStatsPersistent:
 			if optOnce[TableOptionStatsPersistent] {
-				return "Duplicate table option for keyword 'stats_persistent', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'stats_persistent', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionStatsPersistent] = true
 		case TableOptionStatsSamplePages:
 			if optOnce[TableOptionStatsSamplePages] {
-				return "Duplicate table option for keyword 'stats_sample_pages', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'stats_sample_pages', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionStatsSamplePages] = true
 		case TableOptionTableSpace:
 			if optOnce[TableOptionTableSpace] {
-				return "Duplicate table option for keyword 'tablespace', the option should only be appeared just one time in RadonDB."
+				return "Duplicate table option for keyword 'tablespace', the option should only be appeared just one time in NeoDB."
 			}
 			optOnce[TableOptionTableSpace] = true
 		}
@@ -329,8 +356,63 @@ type PartitionDefinition struct {
 	Row     ValTuple
 }
 
-// PartitionOptions specifies the partition options.
-type PartitionOptions []*PartitionDefinition
+// PartitionDefinitions specifies the partition options.
+type PartitionDefinitions []*PartitionDefinition
+
+type (
+	// PartitionOption interface.
+	PartitionOption interface {
+		PartitionType() string
+	}
+
+	// PartOptGlobal global table.
+	PartOptGlobal struct{}
+
+	// PartOptSingle single table.
+	PartOptSingle struct {
+		BackendName string
+	}
+
+	// PartOptNormal normal table.
+	PartOptNormal struct{}
+
+	// PartOptList list table.
+	PartOptList struct {
+		Name     string
+		PartDefs PartitionDefinitions
+	}
+
+	// PartOptHash hash table.
+	PartOptHash struct {
+		Name         string
+		PartitionNum *SQLVal
+	}
+)
+
+// PartitionType return the partition type.
+func (*PartOptGlobal) PartitionType() string {
+	return GlobalTableType
+}
+
+// PartitionType return the partition type.
+func (*PartOptSingle) PartitionType() string {
+	return SingleTableType
+}
+
+// PartitionType return the partition type.
+func (*PartOptNormal) PartitionType() string {
+	return NormalTableType
+}
+
+// PartitionType return the partition type.
+func (*PartOptList) PartitionType() string {
+	return PartitionTableList
+}
+
+// PartitionType return the partition type.
+func (*PartOptHash) PartitionType() string {
+	return PartitionTableHash
+}
 
 // TableOption represents the table options.
 // See https://dev.mysql.com/doc/refman/5.7/en/create-table.html
@@ -364,10 +446,6 @@ const (
 	IndexOptionBlockSize
 	// IndexOptionParser is 'with parser' enum.
 	IndexOptionParser
-	// IndexOptionAlgorithm is 'algorithm' enum.
-	IndexOptionAlgorithm
-	// IndexOptionLock is 'lock' enum.
-	IndexOptionLock
 )
 
 // IndexColumn describes a column in an index definition with optional length
@@ -391,33 +469,65 @@ func NewIndexOptions(columns []*IndexColumn, idxOptList []*IndexOption) *IndexOp
 			idxOpts.BlockSize = idxOpt.Val
 		case IndexOptionParser:
 			idxOpts.Parser = String(idxOpt.Val)
-		case IndexOptionAlgorithm:
-			idxOpts.Algorithm = String(idxOpt.Val)
-		case IndexOptionLock:
-			idxOpts.Lock = String(idxOpt.Val)
 		}
 	}
 	return idxOpts
 }
 
-// CheckIndexLock use to check if the string value matches a supported value.
-// Supported values: default, exclusive, none, shared.
-func CheckIndexLock(lock string) bool {
-	switch strings.ToLower(lock) {
-	case "default", "exclusive", "none", "shared":
-		return true
+// LockType is the type for create/drop/alter index TableSpec.
+// See https://dev.mysql.com/doc/refman/5.7/en/alter-table.html#alter-table-concurrency
+type LockOptionType byte
+
+// Lock options.
+const (
+	LockOptionEmpty LockOptionType = iota + 1
+	LockOptionNone
+	LockOptionDefault
+	LockOptionShared
+	LockOptionExclusive
+)
+
+func (n LockOptionType) String() string {
+	switch n {
+	case LockOptionNone:
+		return "none"
+	case LockOptionDefault:
+		return "default"
+	case LockOptionShared:
+		return "shared"
+	case LockOptionExclusive:
+		return "exclusive"
+	default:
+		return ""
 	}
-	return false
 }
 
-// CheckIndexAlgorithm use to check if the string value matches a supported value.
-// Supported values: inplace, copy, default.
-func CheckIndexAlgorithm(algorithm string) bool {
-	switch strings.ToLower(algorithm) {
-	case "copy", "default", "inplace":
-		return true
+// AlgorithmType is the algorithm for create/drop/alter index TableSpec.
+// See https://dev.mysql.com/doc/refman/8.0/en/alter-table.html#alter-table-performance.
+type AlgorithmOptionType byte
+
+// Algorithms options.
+const (
+	AlgorithmOptionEmpty AlgorithmOptionType = iota
+	AlgorithmOptionDefault
+	AlgorithmOptionCopy
+	AlgorithmOptionInplace
+	AlgorithmOptionInstant
+)
+
+func (a AlgorithmOptionType) String() string {
+	switch a {
+	case AlgorithmOptionDefault:
+		return "default"
+	case AlgorithmOptionCopy:
+		return "copy"
+	case AlgorithmOptionInplace:
+		return "inplace"
+	case AlgorithmOptionInstant:
+		return "instant"
+	default:
+		return ""
 	}
-	return false
 }
 
 // AddColumn appends the given column to the list in the spec
@@ -625,7 +735,7 @@ func (node TableName) IsEmpty() bool {
 
 // NewWhere creates a WHERE or HAVING clause out
 // of a Expr. If the expression is nil, it returns nil.
-func NewWhere(typ string, expr Expr) *Where {
+func NewWhere(typ WhereTypeEnum, expr Expr) *Where {
 	if expr == nil {
 		return nil
 	}

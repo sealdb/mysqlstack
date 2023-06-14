@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Google Inc.
+Copyright 2023-2030 NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,12 +33,12 @@ func TestSet(t *testing.T) {
 		},
 
 		{
-			input:  "SET @@session.radon_stream_fetching= 'OFF'",
-			output: "set @@session.radon_stream_fetching = 'OFF'",
+			input:  "SET @@session.neodb_stream_fetching= 'OFF'",
+			output: "set @@session.neodb_stream_fetching = 'OFF'",
 		},
 		{
-			input:  "SET radon_stream_fetching= false",
-			output: "set radon_stream_fetching = false",
+			input:  "SET neodb_stream_fetching= false",
+			output: "set neodb_stream_fetching = false",
 		},
 		{
 			input:  "SET SESSION wait_timeout = 2147483",

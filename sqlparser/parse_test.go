@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Google Inc.
+Copyright 2023-2030 NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -545,6 +546,12 @@ func TestValid(t *testing.T) {
 	}, {
 		input: "insert /* simple */ into a values (1)",
 	}, {
+		input: "insert /* simple */ high_priority into a partition (col_1) values (1)",
+	}, {
+		input: "insert /* simple */ low_priority into a partition (col_1, col_2) values (1)",
+	}, {
+		input: "insert /* simple */ delayed ignore into a partition (col_1, col_2) values (1)",
+	}, {
 		input: "insert into a values (rand())",
 	}, {
 		input: "insert /* a.b */ into a.b values (1)",
@@ -626,6 +633,72 @@ func TestValid(t *testing.T) {
 	}, {
 		input: "delete /* limit */ from a limit b",
 	}, {
+		input: "delete a from a join b on a.id = b.id where b.name = 'test'",
+	}, {
+		input: "delete a, b from a, b where a.id = b.id and b.name = 'test'",
+	}, {
+		input: "delete /* simple */ ignore from a",
+	}, {
+		input: "delete ignore from a",
+	}, {
+		input: "delete /* limit */ ignore from a",
+	}, {
+		input:  "delete from a1, a2 using t1 as a1 inner join t2 as a2 where a1.id=a2.id",
+		output: "delete a1, a2 from t1 as a1 join t2 as a2 where a1.id = a2.id",
+	}, {
+		input: "delete from t partition (p0) where a = 1",
+	}, {
+		input:  "delete a.*, b.* from tbl_a a, tbl_b b where a.id = b.id and b.name = 'test'",
+		output: "delete a, b from tbl_a as a, tbl_b as b where a.id = b.id and b.name = 'test'",
+	}, {
+		input:  "DELETE from t1 where a=1 limit 1",
+		output: "delete from t1 where a = 1 limit 1",
+	}, {
+		input:  "DELETE LOW_PRIORITY from t1 where a=1",
+		output: "delete low_priority from t1 where a = 1",
+	}, {
+		input:  "DELETE FROM t1 USING t1 WHERE post='1'",
+		output: "delete t1 from t1 where post = '1'",
+	}, {
+		input:  "DELETE FROM t1 WHERE t1.a > 0 ORDER BY t1.a",
+		output: "delete from t1 where t1.a > 0 order by t1.a asc",
+	}, {
+		input:  "DELETE FROM t1 WHERE t1.a > 0 ORDER BY t1.a LIMIT 1",
+		output: "delete from t1 where t1.a > 0 order by t1.a asc limit 1",
+	}, {
+		input:  "DELETE FROM t1 ORDER BY date ASC, time ASC LIMIT 1",
+		output: "delete from t1 order by `date` asc, `time` asc limit 1",
+	}, {
+		input:  "DELETE FROM t1 ORDER BY x",
+		output: "delete from t1 order by x asc",
+	}, {
+		input:  "DELETE FROM t1 ORDER BY (SELECT x)",
+		output: "delete from t1 order by (select x from dual) asc",
+	}, {
+		input:  "DELETE FROM alias USING t1, t2 alias WHERE t1.a = alias.a",
+		output: "delete alias from t1, t2 as alias where t1.a = alias.a",
+	}, {
+		input:  "DELETE FROM t1, alias USING t1, t2 alias WHERE t1.a = alias.a",
+		output: "delete t1, alias from t1, t2 as alias where t1.a = alias.a",
+	}, {
+		input:  "DELETE FROM t1 ORDER BY (f1(10)) LIMIT 1",
+		output: "delete from t1 order by (f1(10)) asc limit 1",
+	}, {
+		input:  "DELETE a1,a2 FROM db1.t1, db2.t2",
+		output: "delete a1, a2 from db1.t1, db2.t2",
+	}, {
+		input:  "DELETE a1,a2 FROM db1.t1 AS a1, db2.t2",
+		output: "delete a1, a2 from db1.t1 as a1, db2.t2",
+	}, {
+		input:  "DELETE a1,a2 FROM db1.t1, db2.t2 AS a2",
+		output: "delete a1, a2 from db1.t1, db2.t2 as a2",
+	}, {
+		input:  "DELETE a1,a2 FROM db3.t1 AS a1, db4.t2 AS a2",
+		output: "delete a1, a2 from db3.t1 as a1, db4.t2 as a2",
+	}, {
+		input:  "DELETE ignore Low_priority QUICK QUICK t1, t2, t3 FROM t1, t2, t3",
+		output: "delete ignore low_priority quick quick t1, t2, t3 from t1, t2, t3",
+	}, {
 		input:  "alter table a alter foo",
 		output: "alter table a",
 	}, {
@@ -691,10 +764,58 @@ func TestValid(t *testing.T) {
 		output: "use `ks:-80@master`",
 	}, {
 		input:  "describe foobar",
-		output: "otherread",
+		output: "show columns from foobar",
 	}, {
 		input:  "desc foobar",
-		output: "otherread",
+		output: "show columns from foobar",
+	}, {
+		input:  "desc foobar t1",
+		output: "show columns from foobar like 't1'",
+	}, {
+		input:  "explain foobar t_",
+		output: "show columns from foobar like 't_'",
+	}, {
+		input:  "explain select * from t",
+		output: "explain",
+	}, {
+		input:  "explain format = traditional select * from t",
+		output: "explain",
+	}, {
+		input:  "explain analyze select * from t",
+		output: "explain",
+	}, {
+		input:  "explain format = tree select * from t",
+		output: "explain",
+	}, {
+		input:  "explain format = json select * from t",
+		output: "explain",
+	}, {
+		input:  "explain extended select * from t",
+		output: "explain",
+	}, {
+		input:  "explain partitions select * from t",
+		output: "explain",
+	}, {
+		input:  "explain delete from t",
+		output: "explain",
+	}, {
+		input:  "explain insert into t(col1, col2) values (1, 2)",
+		output: "explain",
+	}, {
+		input:  "explain update t set col = 2",
+		output: "explain",
+	}, {
+		input:  "help",
+		output: "help",
+	}, {
+		input:  "helP Create",
+		output: "help create",
+	}, {
+		input:  "helP 'Create'",
+		output: "help 'Create'",
+	}, {
+		input:  "helP \"Create\"",
+		output: "help 'Create'",
 	}, {
 		input:  "truncate table foo",
 		output: "truncate table foo",
@@ -702,8 +823,17 @@ func TestValid(t *testing.T) {
 		input:  "repair foo",
 		output: "otheradmin",
 	}, {
-		input:  "optimize foo",
-		output: "otheradmin",
+		input: "optimize table foo",
+	}, {
+		input:  "optimize NO_WRITE_TO_BINLOG tables t1, t2",
+		output: "optimize no_write_to_binlog table t1, t2",
+	}, {
+		input: "optimize local table t1, t2",
+	}, {
+		input: "check table t quick fast medium extended changed for upgrade",
+	}, {
+		input:  "check tables t1,t2 quick quick",
+		output: "check table t1, t2 quick quick",
 	}, {
 		input: "select /* EQ true */ 1 from t where a = true",
 	}, {
@@ -767,6 +897,14 @@ func TestValid(t *testing.T) {
 		input: "select name, group_concat(score) from t group by name",
 	}, {
 		input: "select name, group_concat(distinct id, score order by id desc separator ':') from t group by name",
+	}, {
+		input: "do 1",
+	}, {
+		input: "do 1 collate utf8_general_ci",
+	}, {
+		input: "do 1 > 2",
+	}, {
+		input: "do 1 > 2, 1 != 3, not 1, null is null, not null, 1 or 2, null and 1, 1 not like 2",
 	}}
 
 	for _, tcase := range validSQL {
@@ -775,12 +913,12 @@ func TestValid(t *testing.T) {
 		}
 		tree, err := Parse(tcase.input)
 		if err != nil {
-			t.Errorf("input: %s, err: %v", tcase.input, err)
+			t.Errorf("input: \n%s\n, err: \n%v", tcase.input, err)
 			continue
 		}
 		out := String(tree)
 		if out != tcase.output {
-			t.Errorf("out: %s, want %s", out, tcase.output)
+			t.Errorf("out: \n%s\n, want \n%s", out, tcase.output)
 		}
 		// This test just exercises the tree walking functionality.
 		// There's no way automated way to verify that a node calls
@@ -1219,6 +1357,21 @@ func TestErrors(t *testing.T) {
 		input  string
 		output string
 	}{{
+		input:  "explain select $ from t",
+		output: "syntax error at position 17 near '$'",
+	}, {
+		input:  "explain select analyze format = json from t",
+		output: "syntax error at position 23 near 'analyze'",
+	}, {
+		input:  "explain analyze format = tre select a from t",
+		output: "syntax error at position 29 near 'tre'",
+	}, {
+		input:  "explain analyze format = json select a from t",
+		output: "syntax error at position 30 near 'json'",
+	}, {
+		input:  "help create create",
+		output: "syntax error at position 19 near 'create'",
+	}, {
 		input:  "select $ from t",
 		output: "syntax error at position 9 near '$'",
 	}, {
@@ -1297,6 +1450,12 @@ func TestErrors(t *testing.T) {
 		input:  "insert into a values (select * from b)",
 		output: "syntax error at position 29 near 'select'",
 	}, {
+		input:  "replace  into a values(1,2,3)  on duplicate  key update d=e",
+		output: "syntax error at position 34 near 'on'",
+	}, {
+		input:  "replace  high_priority into a values(1,2,3)",
+		output: "syntax error at position 23 near 'high_priority'",
+	}, {
 		input:  "select database",
 		output: "syntax error at position 17",
 	}, {
@@ -1323,6 +1482,15 @@ func TestErrors(t *testing.T) {
 	}, {
 		input:  "select * from t where id = ((select a from t1 union select b from t2) order by a limit 1)",
 		output: "syntax error at position 76 near 'order'",
+	}, {
+		input:  "DELETE FROM t1 alias USING t1, t2 alias WHERE t1.a = alias.a",
+		output: "syntax error at position 27 near 'using'",
+	}, {
+		input:  "DELETE FROM db1.t1 alias USING db1.t1, db2.t1 alias WHERE db1.t1.a = alias.a",
+		output: "syntax error at position 31 near 'using'",
+	}, {
+		input:  "DELETE FROM t1 alias USING t1 alias WHERE a = 2",
+		output: "syntax error at position 27 near 'using'",
 	}}
 	for _, tcase := range invalidSQL {
 		if tcase.output == "" {
@@ -1330,7 +1498,7 @@ func TestErrors(t *testing.T) {
 		}
 		_, err := Parse(tcase.input)
 		if err == nil || err.Error() != tcase.output {
-			t.Errorf("%s: %v, want %s", tcase.input, err, tcase.output)
+			t.Errorf("%s\ngot\n%v\nwant\n%s", tcase.input, err, tcase.output)
 		}
 	}
 }

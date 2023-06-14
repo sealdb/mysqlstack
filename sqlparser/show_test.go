@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Google Inc.
+Copyright 2023-2030 NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,8 +17,10 @@ limitations under the License.
 
 package sqlparser
 
-import "strings"
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestShow1(t *testing.T) {
 	validSQL := []struct {
@@ -31,6 +34,14 @@ func TestShow1(t *testing.T) {
 		{
 			input:  "show table status from sbtest",
 			output: "show table status from sbtest",
+		},
+		{
+			input:  "show table status from sbtest where Name='t'",
+			output: "show table status from sbtest where Name = 't'",
+		},
+		{
+			input:  "show table status from sbtest like 't'",
+			output: "show table status from sbtest like 't'",
 		},
 		{
 			input:  "show create table t1",
@@ -73,6 +84,14 @@ func TestShow1(t *testing.T) {
 			output: "show create database sbtest",
 		},
 		{
+			input:  "show create schema sbtest",
+			output: "show create database sbtest",
+		},
+		{
+			input:  "show storage engines",
+			output: "show engines",
+		},
+		{
 			input:  "show engines",
 			output: "show engines",
 		},
@@ -101,8 +120,24 @@ func TestShow1(t *testing.T) {
 			output: "show warnings",
 		},
 		{
+			input:  "show warnings limit 1",
+			output: "show warnings limit 1",
+		},
+		{
 			input:  "show variables",
 			output: "show variables",
+		},
+		{
+			input:  "show variables like 'wait_timeout'",
+			output: "show variables like 'wait_timeout'",
+		},
+		{
+			input:  "show global variables like 'wait_timeout'",
+			output: "show global variables like 'wait_timeout'",
+		},
+		{
+			input:  "show variables where Variable_name='wait_timeout'",
+			output: "show variables where Variable_name = 'wait_timeout'",
 		},
 		{
 			input:  "show binlog events",
@@ -121,8 +156,36 @@ func TestShow1(t *testing.T) {
 			output: "show binlog events from gtid '20171225083823' limit 1",
 		},
 		{
+			input:  "show index from t1",
+			output: "show index from t1",
+		},
+		{
+			input:  "show indexes from t1",
+			output: "show index from t1",
+		},
+		{
+			input:  "show keys from t1",
+			output: "show index from t1",
+		},
+		{
+			input:  "show index in t1 in sbtest",
+			output: "show index from sbtest.t1",
+		},
+		{
+			input:  "show index from t1 from sbtest where Key_name='PRIMARY'",
+			output: "show index from sbtest.t1 where Key_name = 'PRIMARY'",
+		},
+		{
 			input:  "show columns from t1",
 			output: "show columns from t1",
+		},
+		{
+			input:  "show columns from t1 from sbtest",
+			output: "show columns from sbtest.t1",
+		},
+		{
+			input:  "show full columns in tt.t1 in sbtest",
+			output: "show full columns from sbtest.t1",
 		},
 		{
 			input:  "show columns from t1 like '%'",
@@ -167,6 +230,30 @@ func TestShow1(t *testing.T) {
 		{
 			input:  "show full fields from t1 where `Key` = 'PRI'",
 			output: "show full columns from t1 where `Key` = 'PRI'",
+		},
+		{
+			input:  "show collation",
+			output: "show collation",
+		},
+		{
+			input:  "show collation where Collation='binary'",
+			output: "show collation where `collation` = 'binary'",
+		},
+		{
+			input:  "show collation like 'binary'",
+			output: "show collation like 'binary'",
+		},
+		{
+			input:  "show charset",
+			output: "show charset",
+		},
+		{
+			input:  "show char set",
+			output: "show charset",
+		},
+		{
+			input:  "show character set",
+			output: "show charset",
 		},
 	}
 

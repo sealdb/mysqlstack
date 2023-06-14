@@ -70,8 +70,12 @@ func (r *replaceCaseExprWhens) inc() {
 	*r++
 }
 
-func replaceChecksumTable(newNode, parent SQLNode) {
-	parent.(*Checksum).Table = newNode.(TableName)
+func replaceCheckTables(newNode, parent SQLNode) {
+	parent.(*Check).Tables = newNode.(TableNames)
+}
+
+func replaceChecksumTables(newNode, parent SQLNode) {
+	parent.(*Checksum).Tables = newNode.(TableNames)
 }
 
 func replaceColNameName(newNode, parent SQLNode) {
@@ -188,10 +192,6 @@ func replaceDDLNewName(newNode, parent SQLNode) {
 	parent.(*DDL).NewName = newNode.(TableName)
 }
 
-func replaceDDLPartitionNum(newNode, parent SQLNode) {
-	parent.(*DDL).PartitionNum = newNode.(*SQLVal)
-}
-
 func replaceDDLTable(newNode, parent SQLNode) {
 	parent.(*DDL).Table = newNode.(TableName)
 }
@@ -202,6 +202,10 @@ func replaceDDLTableSpec(newNode, parent SQLNode) {
 
 func replaceDDLTables(newNode, parent SQLNode) {
 	parent.(*DDL).Tables = newNode.(TableNames)
+}
+
+func replaceDDLindexLockAndAlgorithm(newNode, parent SQLNode) {
+	parent.(*DDL).indexLockAndAlgorithm = newNode.(*IndexLockAndAlgorithm)
 }
 
 func replaceDeleteComments(newNode, parent SQLNode) {
@@ -216,16 +220,32 @@ func replaceDeleteOrderBy(newNode, parent SQLNode) {
 	parent.(*Delete).OrderBy = newNode.(OrderBy)
 }
 
-func replaceDeleteTable(newNode, parent SQLNode) {
-	parent.(*Delete).Table = newNode.(TableName)
+func replaceDeletePartitions(newNode, parent SQLNode) {
+	parent.(*Delete).Partitions = newNode.(Partitions)
+}
+
+func replaceDeleteTableList(newNode, parent SQLNode) {
+	parent.(*Delete).TableList = newNode.(TableNames)
+}
+
+func replaceDeleteTableRefs(newNode, parent SQLNode) {
+	parent.(*Delete).TableRefs = newNode.(TableExprs)
 }
 
 func replaceDeleteWhere(newNode, parent SQLNode) {
 	parent.(*Delete).Where = newNode.(*Where)
 }
 
+func replaceDoExprs(newNode, parent SQLNode) {
+	parent.(*Do).Exprs = newNode.(Exprs)
+}
+
 func replaceExistsExprSubquery(newNode, parent SQLNode) {
 	parent.(*ExistsExpr).Subquery = newNode.(*Subquery)
+}
+
+func replaceExplainStatement(newNode, parent SQLNode) {
+	parent.(*Explain).Statement = newNode.(Statement)
 }
 
 type replaceExprsItems int
@@ -268,6 +288,10 @@ func replaceGroupConcatExprOrderBy(newNode, parent SQLNode) {
 	parent.(*GroupConcatExpr).OrderBy = newNode.(OrderBy)
 }
 
+func replaceHelpHelpInfo(newNode, parent SQLNode) {
+	parent.(*Help).HelpInfo = newNode.(*SQLVal)
+}
+
 func replaceIndexDefinitionName(newNode, parent SQLNode) {
 	parent.(*IndexDefinition).Name = newNode.(ColIdent)
 }
@@ -300,6 +324,10 @@ func replaceInsertComments(newNode, parent SQLNode) {
 
 func replaceInsertOnDup(newNode, parent SQLNode) {
 	parent.(*Insert).OnDup = newNode.(OnDup)
+}
+
+func replaceInsertPartitions(newNode, parent SQLNode) {
+	parent.(*Insert).Partitions = newNode.(Partitions)
 }
 
 func replaceInsertRows(newNode, parent SQLNode) {
@@ -369,6 +397,10 @@ func replaceOptValValue(newNode, parent SQLNode) {
 	parent.(*OptVal).Value = newNode.(Expr)
 }
 
+func replaceOptimizeTables(newNode, parent SQLNode) {
+	parent.(*Optimize).Tables = newNode.(TableNames)
+}
+
 func replaceOrExprLeft(newNode, parent SQLNode) {
 	parent.(*OrExpr).Left = newNode.(Expr)
 }
@@ -403,16 +435,26 @@ func replaceParenTableExprExprs(newNode, parent SQLNode) {
 	parent.(*ParenTableExpr).Exprs = newNode.(TableExprs)
 }
 
-func replaceRadonNewName(newNode, parent SQLNode) {
-	parent.(*Radon).NewName = newNode.(TableName)
+type replacePartitionsItems int
+
+func (r *replacePartitionsItems) replace(newNode, container SQLNode) {
+	container.(Partitions)[int(*r)] = newNode.(ColIdent)
 }
 
-func replaceRadonRow(newNode, parent SQLNode) {
-	parent.(*Radon).Row = newNode.(ValTuple)
+func (r *replacePartitionsItems) inc() {
+	*r++
 }
 
-func replaceRadonTable(newNode, parent SQLNode) {
-	parent.(*Radon).Table = newNode.(TableName)
+func replaceNeoDBNewName(newNode, parent SQLNode) {
+	parent.(*NeoDB).NewName = newNode.(TableName)
+}
+
+func replaceNeoDBRow(newNode, parent SQLNode) {
+	parent.(*NeoDB).Row = newNode.(ValTuple)
+}
+
+func replaceNeoDBTable(newNode, parent SQLNode) {
+	parent.(*NeoDB).Table = newNode.(TableName)
 }
 
 func replaceRangeCondFrom(newNode, parent SQLNode) {
@@ -496,7 +538,7 @@ func (r *replaceSetExprsItems) inc() {
 }
 
 func replaceShowDatabase(newNode, parent SQLNode) {
-	parent.(*Show).Database = newNode.(TableName)
+	parent.(*Show).Database = newNode.(TableIdent)
 }
 
 func replaceShowFilter(newNode, parent SQLNode) {
@@ -734,8 +776,15 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 			replacerWhensB.inc()
 		}
 
+	case *Check:
+		a.apply(node, n.Tables, replaceCheckTables)
+
+	case *CheckOptionList:
+
 	case *Checksum:
-		a.apply(node, n.Table, replaceChecksumTable)
+		a.apply(node, n.Tables, replaceChecksumTables)
+
+	case *ChecksumOptionEnum:
 
 	case ColIdent:
 
@@ -792,10 +841,10 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 		a.apply(node, n.IndexOpts, replaceDDLIndexOpts)
 		a.apply(node, n.ModifyColumnDef, replaceDDLModifyColumnDef)
 		a.apply(node, n.NewName, replaceDDLNewName)
-		a.apply(node, n.PartitionNum, replaceDDLPartitionNum)
 		a.apply(node, n.Table, replaceDDLTable)
 		a.apply(node, n.TableSpec, replaceDDLTableSpec)
 		a.apply(node, n.Tables, replaceDDLTables)
+		a.apply(node, n.indexLockAndAlgorithm, replaceDDLindexLockAndAlgorithm)
 
 	case DatabaseOptionListOpt:
 
@@ -805,13 +854,21 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 		a.apply(node, n.Comments, replaceDeleteComments)
 		a.apply(node, n.Limit, replaceDeleteLimit)
 		a.apply(node, n.OrderBy, replaceDeleteOrderBy)
-		a.apply(node, n.Table, replaceDeleteTable)
+		a.apply(node, n.Partitions, replaceDeletePartitions)
+		a.apply(node, n.TableList, replaceDeleteTableList)
+		a.apply(node, n.TableRefs, replaceDeleteTableRefs)
 		a.apply(node, n.Where, replaceDeleteWhere)
+
+	case *DeleteOptionList:
+
+	case *Do:
+		a.apply(node, n.Exprs, replaceDoExprs)
 
 	case *ExistsExpr:
 		a.apply(node, n.Subquery, replaceExistsExprSubquery)
 
 	case *Explain:
+		a.apply(node, n.Statement, replaceExplainStatement)
 
 	case Exprs:
 		replacer := replaceExprsItems(0)
@@ -838,6 +895,9 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 		a.apply(node, n.Exprs, replaceGroupConcatExprExprs)
 		a.apply(node, n.OrderBy, replaceGroupConcatExprOrderBy)
 
+	case *Help:
+		a.apply(node, n.HelpInfo, replaceHelpHelpInfo)
+
 	case *IndexDefinition:
 		a.apply(node, n.Name, replaceIndexDefinitionName)
 		a.apply(node, n.Opts, replaceIndexDefinitionOpts)
@@ -850,6 +910,8 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 			replacerIndexesB.inc()
 		}
 
+	case *IndexLockAndAlgorithm:
+
 	case *IndexOptions:
 		a.apply(node, n.BlockSize, replaceIndexOptionsBlockSize)
 
@@ -857,6 +919,7 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 		a.apply(node, n.Columns, replaceInsertColumns)
 		a.apply(node, n.Comments, replaceInsertComments)
 		a.apply(node, n.OnDup, replaceInsertOnDup)
+		a.apply(node, n.Partitions, replaceInsertPartitions)
 		a.apply(node, n.Rows, replaceInsertRows)
 		a.apply(node, n.Table, replaceInsertTable)
 
@@ -902,6 +965,11 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 	case *OptVal:
 		a.apply(node, n.Value, replaceOptValValue)
 
+	case *Optimize:
+		a.apply(node, n.Tables, replaceOptimizeTables)
+
+	case *OptimizeOptionEnum:
+
 	case *OrExpr:
 		a.apply(node, n.Left, replaceOrExprLeft)
 		a.apply(node, n.Right, replaceOrExprRight)
@@ -930,10 +998,18 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 	case *ParenTableExpr:
 		a.apply(node, n.Exprs, replaceParenTableExprExprs)
 
-	case *Radon:
-		a.apply(node, n.NewName, replaceRadonNewName)
-		a.apply(node, n.Row, replaceRadonRow)
-		a.apply(node, n.Table, replaceRadonTable)
+	case Partitions:
+		replacer := replacePartitionsItems(0)
+		replacerRef := &replacer
+		for _, item := range n {
+			a.apply(node, item, replacerRef.replace)
+			replacerRef.inc()
+		}
+
+	case *NeoDB:
+		a.apply(node, n.NewName, replaceNeoDBNewName)
+		a.apply(node, n.Row, replaceNeoDBRow)
+		a.apply(node, n.Table, replaceNeoDBTable)
 
 	case *RangeCond:
 		a.apply(node, n.From, replaceRangeCondFrom)

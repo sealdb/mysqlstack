@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Google Inc.
+Copyright 2023-2030 NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,6 +40,16 @@ func TestKill(t *testing.T) {
 		{
 			input:  "kill query 1",
 			output: "kill 1",
+		},
+
+		{
+			input:  "kill CONNECTION 2",
+			output: "kill 2",
+		},
+
+		{
+			input:  "kill connection 3",
+			output: "kill 3",
 		},
 	}
 

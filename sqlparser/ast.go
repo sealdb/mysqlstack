@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Google Inc.
+Copyright 2023-2030 NeoDB Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -85,13 +86,15 @@ type (
 	// Replaces are currently disallowed in sharded schemas because
 	// of the implications the deletion part may have on vindexes.
 	Insert struct {
-		Action   string
-		Comments Comments
-		Ignore   string
-		Table    TableName
-		Columns  Columns
-		Rows     InsertRows
-		OnDup    OnDup
+		Action     string
+		Comments   Comments
+		LockOption string
+		Ignore     string
+		Table      TableName
+		Partitions Partitions
+		Columns    Columns
+		Rows       InsertRows
+		OnDup      OnDup
 	}
 
 	// Update represents an UPDATE statement.
@@ -104,13 +107,29 @@ type (
 		Limit    *Limit
 	}
 
+	// DeleteOptions is used by delete_stmt
+	DeleteOptionList []DeleteOptionEnum
+
 	// Delete represents a DELETE statement.
 	Delete struct {
-		Comments Comments
-		Table    TableName
-		Where    *Where
-		OrderBy  OrderBy
-		Limit    *Limit
+		Comments         Comments
+		DeleteOptionList DeleteOptionList
+		// TableRefs is used in both single table and multiple table delete statement.
+		// For single table, the len(TableRefs)=1 and the type of TableExpr is AliasedTableExpr.
+		IsSingleTable bool
+		TableRefs     TableExprs
+		Partitions    Partitions
+		// TableList is only used in multiple table delete statement.
+		IsTableBeforeFrom bool
+		TableList         TableNames
+		Where             *Where
+		OrderBy           OrderBy
+		Limit             *Limit
+	}
+
+	// Do represents a DO statement.
+	Do struct {
+		Exprs Exprs
 	}
 
 	// Set represents a SET statement.
@@ -127,8 +146,6 @@ type (
 		Engine          string
 		Charset         string
 		IndexName       string
-		PartitionName   string
-		BackendName     string
 		IfExists        bool
 		IfNotExists     bool
 		Table           TableName
@@ -136,10 +153,14 @@ type (
 		Database        TableIdent
 		DatabaseOptions DatabaseOptionListOpt
 		TableSpec       *TableSpec
+		PartitionOption PartitionOption
 
 		// [UNIQUE | FULLTEXT | SPATIAL] index.
 		IndexType string
 		IndexOpts *IndexOptions
+
+		// lock and algorithm option
+		indexLockAndAlgorithm *IndexLockAndAlgorithm
 
 		// Tables is set if Action is DropStr.
 		Tables TableNames
@@ -147,18 +168,15 @@ type (
 		// table column operation
 		DropColumnName  string
 		ModifyColumnDef *ColumnDefinition
-
-		// Partition options.
-		PartitionOptions PartitionOptions
-		PartitionNum     *SQLVal
 	}
 
 	// Show represents a show statement.
 	Show struct {
 		Type     string
 		Full     string
+		Scope    string
 		Table    TableName
-		Database TableName
+		Database TableIdent
 		From     string
 		Limit    *Limit
 		Filter   *ShowFilter
@@ -166,7 +184,20 @@ type (
 
 	// Checksum represents a CHECKSUM statement.
 	Checksum struct {
-		Table TableName
+		Tables         TableNames
+		ChecksumOption ChecksumOptionEnum
+	}
+
+	// Optimize represents a Optimize statement.
+	Optimize struct {
+		OptimizeOption OptimizeOptionEnum
+		Tables         TableNames
+	}
+
+	// Check represents a Check statement.
+	Check struct {
+		Tables       TableNames
+		CheckOptions CheckOptionList
 	}
 
 	// Use represents a use statement.
@@ -174,19 +205,19 @@ type (
 		DBName TableIdent
 	}
 
-	// OtherRead represents a DESCRIBE, or EXPLAIN statement.
+	// OtherRead represents EXPLAIN statement.
 	// It should be used only as an indicator. It does not contain
 	// the full AST for the statement.
 	OtherRead struct{}
 
 	// OtherAdmin represents a misc statement that relies on ADMIN privileges,
-	// such as REPAIR, OPTIMIZE, or TRUNCATE statement.
+	// such as REPAIR statement.
 	// It should be used only as an indicator. It does not contain
 	// the full AST for the statement.
 	OtherAdmin struct{}
 
-	// Radon represents the radon statement.
-	Radon struct {
+	// NeoDB represents the neodb statement.
+	NeoDB struct {
 		Action  string
 		Row     ValTuple
 		Table   TableName
@@ -194,7 +225,16 @@ type (
 	}
 
 	// Explain represents a explain statement.
-	Explain struct{}
+	Explain struct {
+		Type      ExplainType
+		Analyze   bool
+		Statement Statement
+	}
+
+	// Help represents a help statement.
+	Help struct {
+		HelpInfo *SQLVal
+	}
 
 	// Kill represents a KILL statement.
 	Kill struct {
@@ -222,19 +262,25 @@ func (*Delete) iStatement()      {}
 func (*Set) iStatement()         {}
 func (*DDL) iStatement()         {}
 func (*Show) iStatement()        {}
-func (*Checksum) iStatement()    {}
 func (*Use) iStatement()         {}
 func (*OtherRead) iStatement()   {}
 func (*OtherAdmin) iStatement()  {}
-func (*Radon) iStatement()       {}
+func (*NeoDB) iStatement()       {}
 func (*Explain) iStatement()     {}
+func (*Help) iStatement()        {}
 func (*Kill) iStatement()        {}
 func (*Transaction) iStatement() {}
 func (*Xa) iStatement()          {}
+func (*Do) iStatement()          {}
 
 func (*Select) iSelectStatement()      {}
 func (*Union) iSelectStatement()       {}
 func (*ParenSelect) iSelectStatement() {}
+
+// Table Maintenance Statements
+func (*Check) iStatement()    {}
+func (*Checksum) iStatement() {}
+func (*Optimize) iStatement() {}
 
 type (
 	// InsertRows represents the rows for an INSERT statement.
@@ -261,7 +307,6 @@ type TableOptions struct {
 	Comment          string
 	Engine           string
 	Charset          string
-	Type             string
 	AvgRowLength     string
 	Checksum         string
 	Collate          string
@@ -291,17 +336,22 @@ type IndexOptions struct {
 	Comment   string
 	BlockSize *SQLVal
 	Parser    string
-	Algorithm string
-	Lock      string
 }
 
 // IndexDefinition describes an index in a CREATE TABLE statement
 type IndexDefinition struct {
-	Type    string
+	Type string
+	// TODO: in the future will refactor type ColIdent to string to make format code more clear
 	Name    ColIdent
 	Opts    *IndexOptions
 	Primary bool
 	Unique  bool
+}
+
+// IndexLockAndAlgorithm describes lock and algorithm type in index
+type IndexLockAndAlgorithm struct {
+	LockOption      LockOptionType
+	AlgorithmOption AlgorithmOptionType
 }
 
 // TableSpec describes the structure of a table from a CREATE TABLE statement
@@ -395,6 +445,9 @@ func (Nextval) iSelectExpr()      {}
 // Columns represents an insert column list.
 type Columns []ColIdent
 
+// Partitions is a type alias for Columns so we can handle printing efficiently
+type Partitions Columns
+
 // TableExprs represents a list of table expressions.
 type TableExprs []TableExpr
 
@@ -468,7 +521,7 @@ type IndexHints struct {
 
 // Where represents a WHERE or HAVING clause.
 type Where struct {
-	Type string
+	Type WhereTypeEnum
 	Expr Expr
 }
 
@@ -825,10 +878,12 @@ func (node *Union) SetLimit(limit *Limit) {
 
 // Format formats the node.
 func (node *Insert) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%s %v%sinto %v%v %v%v",
-		node.Action,
-		node.Comments, node.Ignore,
-		node.Table, node.Columns, node.Rows, node.OnDup)
+	buf.Myprintf("%s %v", node.Action, node.Comments)
+	if node.LockOption != "" {
+		buf.Myprintf("%s ", node.LockOption)
+	}
+	buf.Myprintf("%sinto %v%v%v %v%v",
+		node.Ignore, node.Table, node.Partitions, node.Columns, node.Rows, node.OnDup)
 }
 
 // Format formats the node.
@@ -840,17 +895,19 @@ func (node *Update) Format(buf *TrackedBuffer) {
 
 // Format formats the node.
 func (node *Delete) Format(buf *TrackedBuffer) {
-	buf.Myprintf("delete %vfrom %v%v%v%v", node.Comments, node.Table, node.Where, node.OrderBy, node.Limit)
+	if node.IsSingleTable {
+		// Single table
+		buf.Myprintf("delete %v%vfrom %v%v%v%v%v", node.Comments, &(node.DeleteOptionList), node.TableRefs, node.Partitions, node.Where, node.OrderBy, node.Limit)
+	} else {
+		// delete t1,t2... from table_references ...
+		// delete ... from t1,t2 ... using ... ---> delete t1,t2... from table_references ...
+		buf.Myprintf("delete %v%v%v from %v%v%v%v", node.Comments, &(node.DeleteOptionList), node.TableList, node.TableRefs, node.Where, node.OrderBy, node.Limit)
+	}
 }
 
 // Format formats the node.
 func (node *Set) Format(buf *TrackedBuffer) {
 	buf.Myprintf("set %v%v", node.Comments, node.Exprs)
-}
-
-// Format formats the node.
-func (node *Checksum) Format(buf *TrackedBuffer) {
-	buf.Myprintf("checksum table %v", node.Table)
 }
 
 // Format formats the node.
@@ -880,15 +937,21 @@ func (node *DDL) Format(buf *TrackedBuffer) {
 			buf.Myprintf("%s%s %v %v", node.Action, ifnotexists, node.NewName, node.TableSpec)
 		}
 	case CreateIndexStr:
-		buf.Myprintf("create %s%s on %v%v", node.IndexType, node.IndexName, node.NewName, node.IndexOpts)
+		buf.Myprintf("create %s%s on %v%v%v", node.IndexType, node.IndexName, node.NewName, node.IndexOpts, node.indexLockAndAlgorithm)
 	case DropTableStr:
 		exists := ""
 		if node.IfExists {
 			exists = " if exists"
 		}
 		buf.Myprintf("%s%s %v", node.Action, exists, node.Tables)
+	case DropTempTableStr:
+		exists := ""
+		if node.IfExists {
+			exists = " if exists"
+		}
+		buf.Myprintf("%s%s %v", node.Action, exists, node.Tables)
 	case DropIndexStr:
-		buf.Myprintf("%s %s on %v", node.Action, node.IndexName, node.Table)
+		buf.Myprintf("%s %s on %v%v", node.Action, node.IndexName, node.Table, node.indexLockAndAlgorithm)
 	case RenameStr:
 		buf.Myprintf("%s %v to %v", node.Action, node.Table, node.NewName)
 	case AlterStr:
@@ -903,6 +966,8 @@ func (node *DDL) Format(buf *TrackedBuffer) {
 		buf.Myprintf("alter table %v drop column `%s`", node.NewName, node.DropColumnName)
 	case AlterModifyColumnStr:
 		buf.Myprintf("alter table %v modify column %v", node.NewName, node.ModifyColumnDef)
+	case AlterDatabase:
+		buf.Myprintf("%s %s%v", node.Action, node.Database.String(), node.DatabaseOptions)
 	case TruncateTableStr:
 		buf.Myprintf("%s %v", node.Action, node.NewName)
 	}
@@ -911,7 +976,12 @@ func (node *DDL) Format(buf *TrackedBuffer) {
 // Format formats the node
 func (optList DatabaseOptionListOpt) Format(buf *TrackedBuffer) {
 	for _, dbOpt := range optList.DBOptList {
-		buf.Myprintf(" %s %s", dbOpt.CharsetOrCollate, dbOpt.Value)
+		if dbOpt.ReadOnlyValue != "" {
+			// only in case alter database
+			buf.Myprintf(" read only = %s", dbOpt.ReadOnlyValue)
+		} else {
+			buf.Myprintf(" %s %v", dbOpt.OptType, dbOpt.Value)
+		}
 	}
 }
 
@@ -1014,12 +1084,6 @@ func (opts *IndexOptions) Format(buf *TrackedBuffer) {
 	if opts.Parser != "" {
 		buf.Myprintf(" WITH PARSER %s", opts.Parser)
 	}
-	if opts.Algorithm != "" {
-		buf.Myprintf(" algorithm = %s", opts.Algorithm)
-	}
-	if opts.Lock != "" {
-		buf.Myprintf(" lock = %s", opts.Lock)
-	}
 }
 
 // Format formats the node.
@@ -1109,27 +1173,35 @@ func (idx *IndexDefinition) Format(buf *TrackedBuffer) {
 	if idx.Primary {
 		buf.Myprintf("%s", idx.Type)
 	} else {
-		buf.Myprintf("%s `%v`", idx.Type, idx.Name)
+		buf.Myprintf("%s", idx.Type)
+		if idx.Name.val != "" {
+			buf.Myprintf(" `%v`", idx.Name)
+		}
 	}
 	buf.Myprintf(" %v", idx.Opts)
+}
+
+// Format formats the node
+func (idxLA *IndexLockAndAlgorithm) Format(buf *TrackedBuffer) {
+	if idxLA.AlgorithmOption != AlgorithmOptionEmpty {
+		buf.Myprintf(" algorithm = %s", idxLA.AlgorithmOption.String())
+	}
+	if idxLA.LockOption != LockOptionEmpty {
+		buf.Myprintf(" lock = %s", idxLA.LockOption.String())
+	}
 }
 
 // Format formats the node.
 func (node *Show) Format(buf *TrackedBuffer) {
 	switch node.Type {
 	case ShowCreateDatabaseStr:
-		buf.Myprintf("show %s %v", node.Type, node.Database)
-	case ShowTableStatusStr:
-		buf.Myprintf("show %s", node.Type)
-		if node.Database.Name.String() != "" {
-			buf.Myprintf(" from %s", node.Database.Name.String())
-		}
+		buf.Myprintf("show %s %s", node.Type, node.Database.String())
 	case ShowCreateTableStr:
 		buf.Myprintf("show %s %v", node.Type, node.Table)
-	case ShowTablesStr:
+	case ShowTableStatusStr, ShowTablesStr:
 		buf.Myprintf("show %s%s", node.Full, node.Type)
-		if node.Database.Name.String() != "" {
-			buf.Myprintf(" from %s", node.Database.Name.String())
+		if !node.Database.IsEmpty() {
+			buf.Myprintf(" from %s", node.Database.String())
 		}
 		if node.Filter != nil {
 			buf.Myprintf("%v", node.Filter)
@@ -1140,7 +1212,7 @@ func (node *Show) Format(buf *TrackedBuffer) {
 			buf.Myprintf(" from gtid '%s'", node.From)
 		}
 		buf.Myprintf("%v", node.Limit)
-	case ShowColumnsStr:
+	case ShowColumnsStr, ShowIndexStr:
 		buf.Myprintf("show %s%s", node.Full, node.Type)
 		if node.Table.Name.String() != "" {
 			buf.Myprintf(" from %v", node.Table)
@@ -1148,6 +1220,24 @@ func (node *Show) Format(buf *TrackedBuffer) {
 		if node.Filter != nil {
 			buf.Myprintf("%v", node.Filter)
 		}
+	case ShowDatabasesStr, ShowCollationStr:
+		buf.Myprintf("show %s", node.Type)
+		if node.Filter != nil {
+			buf.Myprintf("%v", node.Filter)
+		}
+	case ShowVariablesStr:
+		buf.WriteString("show ")
+		if node.Scope != "" {
+			buf.WriteString(node.Scope)
+			buf.WriteString(" ")
+		}
+		buf.WriteString(node.Type)
+		if node.Filter != nil {
+			buf.Myprintf("%v", node.Filter)
+		}
+	case ShowWarningsStr:
+		buf.Myprintf("show %s", node.Type)
+		buf.Myprintf("%v", node.Limit)
 	default:
 		buf.Myprintf("show %s", node.Type)
 	}
@@ -1249,6 +1339,19 @@ func (node Columns) Format(buf *TrackedBuffer) {
 	buf.WriteString(")")
 }
 
+// Format formats the node
+func (node Partitions) Format(buf *TrackedBuffer) {
+	if node == nil {
+		return
+	}
+	prefix := " partition ("
+	for _, n := range node {
+		buf.Myprintf("%s%v", prefix, n)
+		prefix = ", "
+	}
+	buf.WriteString(")")
+}
+
 // Format formats the node.
 func (node TableExprs) Format(buf *TrackedBuffer) {
 	var prefix string
@@ -1319,7 +1422,7 @@ func (node *Where) Format(buf *TrackedBuffer) {
 	if node == nil || node.Expr == nil {
 		return
 	}
-	buf.Myprintf(" %s %v", node.Type, node.Expr)
+	buf.Myprintf(" %s %v", WhereType2Str[node.Type], node.Expr)
 }
 
 // Format formats the node.
@@ -1886,22 +1989,38 @@ func (node TableIdent) Format(buf *TrackedBuffer) {
 }
 
 // Format formats the node.
-func (node *Radon) Format(buf *TrackedBuffer) {
+func (node *NeoDB) Format(buf *TrackedBuffer) {
 	switch node.Action {
 	case AttachListStr:
-		buf.Myprintf("radon %s", node.Action)
+		buf.Myprintf("neodb %s", node.Action)
 	case AttachStr, DetachStr:
-		buf.Myprintf("radon %s %v", node.Action, node.Row)
+		buf.Myprintf("neodb %s %v", node.Action, node.Row)
 	case ReshardStr:
-		buf.Myprintf("radon %s %v to %v", node.Action, node.Table, node.NewName)
+		buf.Myprintf("neodb %s %v to %v", node.Action, node.Table, node.NewName)
 	case CleanupStr:
-		buf.Myprintf("radon %s", node.Action)
+		buf.Myprintf("neodb %s", node.Action)
+	case RebalanceStr:
+		buf.Myprintf("neodb %s", node.Action)
+	case XARecoverStr:
+		buf.Myprintf("neodb %s", node.Action)
+	case XACommitStr:
+		buf.Myprintf("neodb %s", node.Action)
+	case XARollbackStr:
+		buf.Myprintf("neodb %s", node.Action)
 	}
 }
 
 // Format formats the node.
 func (node *Explain) Format(buf *TrackedBuffer) {
 	buf.WriteString("explain")
+}
+
+// Format formats the node.
+func (node *Help) Format(buf *TrackedBuffer) {
+	buf.Myprintf("help")
+	if node.HelpInfo != nil {
+		buf.Myprintf(" %v", node.HelpInfo)
+	}
 }
 
 // Format formats the node.
@@ -1926,4 +2045,63 @@ func (node *Transaction) Format(buf *TrackedBuffer) {
 // Format formats the node.
 func (node *Xa) Format(buf *TrackedBuffer) {
 	buf.WriteString("XA")
+}
+
+// Format formats the node.
+func (node *ChecksumOptionEnum) Format(buf *TrackedBuffer) {
+	if node == nil || *node == ChecksumOptionNone {
+		return
+	}
+	buf.Myprintf(" %s", ChecksumOption2Str[*node])
+}
+
+// Format formats the node.
+func (node *Do) Format(buf *TrackedBuffer) {
+	buf.Myprintf("do %v", node.Exprs)
+}
+
+// Format formats the node.
+func (node *Checksum) Format(buf *TrackedBuffer) {
+	buf.Myprintf("checksum table %v%v", node.Tables, &(node.ChecksumOption))
+}
+
+// Format formats the node.
+func (node *Optimize) Format(buf *TrackedBuffer) {
+	buf.Myprintf("optimize %vtable %v", &(node.OptimizeOption), node.Tables)
+}
+
+// Format formats the node.
+func (node *OptimizeOptionEnum) Format(buf *TrackedBuffer) {
+	if node == nil || *node == OptimizeOptionNone {
+		return
+	}
+	buf.Myprintf("%s ", OptimizeOption2Str[*node])
+}
+
+// Format formats the node.
+func (node *CheckOptionList) Format(buf *TrackedBuffer) {
+	if node == nil {
+		return
+	}
+	for _, opt := range *node {
+		buf.Myprintf(" %s", CheckOption2Str[opt])
+	}
+}
+
+// Format formats the node.
+func (node *Check) Format(buf *TrackedBuffer) {
+	if node == nil {
+		return
+	}
+	buf.Myprintf("check table %v%v", node.Tables, &(node.CheckOptions))
+}
+
+// Format formats the node.
+func (node *DeleteOptionList) Format(buf *TrackedBuffer) {
+	if node == nil || len(*node) == 0 {
+		return
+	}
+	for _, opt := range *node {
+		buf.Myprintf("%s ", DeleteOptions2Str[opt])
+	}
 }
