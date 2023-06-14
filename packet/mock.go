@@ -1,9 +1,9 @@
 /*
  * mysqlstack
- * xelabs.org
  *
  * Copyright (c) XeLabs
- * Copyright 2016 The Go-MySQL-Driver Authors. All rights reserved.
+ * Copyright 2016 The Go-MySQL-Driver Authors.
+ * Copyright (c) 2023-2030 NeoDB Author
  * GPL License
  *
  */

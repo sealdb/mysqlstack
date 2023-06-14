@@ -2,9 +2,9 @@
  * This code was derived from https://github.com/youtube/vitess.
  *
  * mysqlstack
- * xelabs.org
  *
  * Copyright (c) XeLabs
+ * Copyright (c) 2023-2030 NeoDB Author
  * GPL License
  *
  */
