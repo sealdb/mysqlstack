@@ -1,4 +1,4 @@
-name: mydumper Coverage
+name: mysqlstack Coverage
 on: [push, pull_request]
 jobs:
 
@@ -18,7 +18,9 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Coverage
+      # uses: codecov/codecov-action@v3
+        # env: CODECOV_TOKEN: 0ec02b14-796d-40e1-ba4f-834ff20cf345
       run: |
         export PATH=$PATH:$(go env GOPATH)/bin
         make coverage
-        bash <(curl -s https://codecov.io/bash) -f "!mock.go" -t 27d0f712-a1c6-42b3-92a5-ad7c9117ed1a
+        bash <(curl -s https://codecov.io/bash) -f "!mock.go" -t 0ec02b14-796d-40e1-ba4f-834ff20cf345
